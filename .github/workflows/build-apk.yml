@@ -1,4 +1,4 @@
-name: Build BINGOP2E APK - FINAL FIXED
+name: Build BINGOP2E APK
 
 on:
   workflow_dispatch:
@@ -19,24 +19,27 @@ jobs:
         run: |
           if [ -f BINGOP2E_Android_Starter.zip ]; then
             unzip -q BINGOP2E_Android_Starter.zip
-            echo "PROJECT_DIR=BINGOP2E_Android_Starter" >> $GITHUB_ENV
-          else
-            echo "PROJECT_DIR=." >> $GITHUB_ENV
+            rm -f BINGOP2E_Android_Starter.zip
           fi
+          ls -la
 
-      - name: Fix JVM Target to 17
+      - name: Find gradlew and fix JVM
         run: |
-          FILE="${{ env.PROJECT_DIR }}/app/build.gradle.kts"
+          GRADLEW=$(find . -name "gradlew" -type f | head -n 1)
+          if [ -z "$GRADLEW" ]; then
+            echo "No gradlew found!"
+            exit 1
+          fi
+          DIR=$(dirname "$GRADLEW")
+          echo "PROJECT_DIR=$DIR" >> $GITHUB_ENV
+          echo "Found at $GRADLEW in $DIR"
+          chmod +x "$GRADLEW"
+          FILE="$DIR/app/build.gradle.kts"
           [ -f "$FILE" ] || FILE="app/build.gradle.kts"
-          echo "Fixing $FILE"
           sed -i 's/VERSION_1_8/VERSION_17/g' "$FILE" || true
           sed -i 's/VERSION_11/VERSION_17/g' "$FILE" || true
           sed -i 's/jvmTarget = "1.8"/jvmTarget = "17"/g' "$FILE" || true
           sed -i 's/jvmTarget = "11"/jvmTarget = "17"/g' "$FILE" || true
-          # Add if missing
-          if ! grep -q "jvmTarget" "$FILE"; then
-            echo 'android { kotlinOptions { jvmTarget = "17" } }' >> "$FILE"
-          fi
 
       - name: Set up Java 17
         uses: actions/setup-java@v5
@@ -44,15 +47,10 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-
       - name: Build debug APK
         run: |
-          chmod +x $PROJECT_DIR/gradlew 2>/dev/null || true
-          $PROJECT_DIR/gradlew -p $PROJECT_DIR assembleDebug --stacktrace
+          cd $PROJECT_DIR
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
