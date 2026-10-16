@@ -1,0 +1,35 @@
+name: Build BINGOP2E APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Unpack starter project if uploaded as ZIP
+        run: | if [ -f BINGOP2E_Android_Starter.zip ]; then unzip -q BINGOP2E_Android_Starter.zip fi if [ ! -f BINGOP2E_Android_Starter/app/build.gradle.kts ] && [ -f app/build.gradle.kts ]; then echo "PROJECT_DIR=." >> "$GITHUB_ENV" else echo "PROJECT_DIR=BINGOP2E_Android_Starter" >> "$GITHUB_ENV" fi       - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build debug APK
+        run: gradle -p "$PROJECT_DIR" assembleDebug --stacktrace
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BINGOP2E-debug-APK
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 7
