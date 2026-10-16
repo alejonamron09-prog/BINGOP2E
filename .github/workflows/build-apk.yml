@@ -1,4 +1,4 @@
-name: Build BINGOP2E APK
+name: Build BINGOP2E APK - FINAL FIXED
 
 on:
   workflow_dispatch:
@@ -15,19 +15,31 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Unpack starter project if uploaded as ZIP
+      - name: Unpack starter if ZIP exists
         run: |
           if [ -f BINGOP2E_Android_Starter.zip ]; then
             unzip -q BINGOP2E_Android_Starter.zip
-          fi
-          if [ ! -f BINGOP2E_Android_Starter/app/build.gradle.kts ] && [ -f app/build.gradle.kts ]; then
-            echo "PROJECT_DIR=." >> "$GITHUB_ENV"
+            echo "PROJECT_DIR=BINGOP2E_Android_Starter" >> $GITHUB_ENV
           else
-            echo "PROJECT_DIR=BINGOP2E_Android_Starter" >> "$GITHUB_ENV"
+            echo "PROJECT_DIR=." >> $GITHUB_ENV
           fi
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      - name: Fix JVM Target to 17
+        run: |
+          FILE="${{ env.PROJECT_DIR }}/app/build.gradle.kts"
+          [ -f "$FILE" ] || FILE="app/build.gradle.kts"
+          echo "Fixing $FILE"
+          sed -i 's/VERSION_1_8/VERSION_17/g' "$FILE" || true
+          sed -i 's/VERSION_11/VERSION_17/g' "$FILE" || true
+          sed -i 's/jvmTarget = "1.8"/jvmTarget = "17"/g' "$FILE" || true
+          sed -i 's/jvmTarget = "11"/jvmTarget = "17"/g' "$FILE" || true
+          # Add if missing
+          if ! grep -q "jvmTarget" "$FILE"; then
+            echo 'android { kotlinOptions { jvmTarget = "17" } }' >> "$FILE"
+          fi
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -38,7 +50,9 @@ jobs:
           gradle-version: '8.9'
 
       - name: Build debug APK
-        run: gradle -p "$PROJECT_DIR" assembleDebug --stacktrace
+        run: |
+          chmod +x $PROJECT_DIR/gradlew 2>/dev/null || true
+          $PROJECT_DIR/gradlew -p $PROJECT_DIR assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
